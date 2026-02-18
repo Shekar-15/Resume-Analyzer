@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Resume Analyzer - ATS System</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🎯 Resume Analyzer</h1>
+            <p class="subtitle">AI-Powered Applicant Tracking System</p>
+        </header>
+
+        <div class="upload-section" id="uploadSection">
+            <div class="upload-card">
+                <h2>Upload Resume & Job Description</h2>
+                
+                <form id="analyzeForm" enctype="multipart/form-data">
+                    <div class="form-group">
+                        <label for="resume">Resume (PDF or Image)</label>
+                        <div class="file-input-wrapper">
+                            <input type="file" id="resume" name="resume" accept=".pdf,.png,.jpg,.jpeg,.gif,.bmp" required>
+                            <span class="file-name" id="fileName">Choose file...</span>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="job_description">Job Description</label>
+                        <textarea id="job_description" name="job_description" rows="8" 
+                                  placeholder="Paste the job description here..." required></textarea>
+                    </div>
+                    
+                    <button type="submit" class="btn-primary" id="analyzeBtn">
+                        <span>Analyze Resume</span>
+                        <div class="loader" id="loader"></div>
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <div class="results-section" id="resultsSection" style="display: none;">
+            <div class="results-header">
+                <h2>Analysis Results</h2>
+                <button class="btn-secondary" onclick="resetForm()">Analyze Another</button>
+            </div>
+            
+            <div class="results-grid">
+                <!-- Contact Details -->
+                <div class="card contact-card">
+                    <h3>📞 Contact Details</h3>
+                    <div id="contactDetails"></div>
+                </div>
+
+                <!-- Fit Assessment -->
+                <div class="card fit-card" id="fitCard">
+                    <h3>✓ Fit for Role</h3>
+                    <div class="fit-indicator">
+                        <div class="fit-percentage" id="fitPercentage">0%</div>
+                        <div class="fit-status" id="fitStatus">Analyzing...</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Metrics Dashboard -->
+            <div class="metrics-dashboard">
+                <div class="metric-card">
+                    <h4>Technical Depth</h4>
+                    <div class="circular-progress" data-percentage="0">
+                        <svg viewBox="0 0 120 120">
+                            <circle class="bg" cx="60" cy="60" r="50"></circle>
+                            <circle class="progress" cx="60" cy="60" r="50" id="techDepthCircle"></circle>
+                        </svg>
+                        <div class="percentage" id="techDepthText">0%</div>
+                    </div>
+                </div>
+
+                <div class="metric-card">
+                    <h4>Leadership</h4>
+                    <div class="circular-progress" data-percentage="0">
+                        <svg viewBox="0 0 120 120">
+                            <circle class="bg" cx="60" cy="60" r="50"></circle>
+                            <circle class="progress" cx="60" cy="60" r="50" id="leadershipCircle"></circle>
+                        </svg>
+                        <div class="percentage" id="leadershipText">0%</div>
+                    </div>
+                </div>
+
+                <div class="metric-card">
+                    <h4>Experience</h4>
+                    <div class="circular-progress" data-percentage="0">
+                        <svg viewBox="0 0 120 120">
+                            <circle class="bg" cx="60" cy="60" r="50"></circle>
+                            <circle class="progress" cx="60" cy="60" r="50" id="experienceCircle"></circle>
+                        </svg>
+                        <div class="percentage" id="experienceText">0%</div>
+                    </div>
+                </div>
+
+                <div class="metric-card">
+                    <h4>Skills Match</h4>
+                    <div class="circular-progress" data-percentage="0">
+                        <svg viewBox="0 0 120 120">
+                            <circle class="bg" cx="60" cy="60" r="50"></circle>
+                            <circle class="progress" cx="60" cy="60" r="50" id="skillsMatchCircle"></circle>
+                        </svg>
+                        <div class="percentage" id="skillsMatchText">0%</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Detailed Analysis -->
+            <div class="details-grid">
+                <div class="card">
+                    <h3>💼 Experience</h3>
+                    <div id="experienceDetails"></div>
+                </div>
+
+                <div class="card">
+                    <h3>🛠️ Skills</h3>
+                    <div id="skillsDetails"></div>
+                </div>
+            </div>
+
+            <!-- Key Responsibilities -->
+            <div class="card responsibilities-card">
+                <h3>🎯 Key Responsibilities</h3>
+                <ul id="responsibilities"></ul>
+            </div>
+
+            <!-- Technical Skills -->
+            <div class="card technical-skills-card">
+                <h3>🔧 Required Technical Skills</h3>
+                <div id="technicalSkills"></div>
+            </div>
+
+            <!-- Advantages & Disadvantages -->
+            <div class="pros-cons-grid">
+                <div class="card advantages-card">
+                    <h3>✅ Advantages</h3>
+                    <ul id="advantages"></ul>
+                </div>
+
+                <div class="card disadvantages-card">
+                    <h3>❌ Disadvantages</h3>
+                    <ul id="disadvantages"></ul>
+                </div>
+            </div>
+        </div>
+
+        <div class="error-message" id="errorMessage" style="display: none;"></div>
+    </div>
+
+    <script src="/static/script.js"></script>
+</body>
+</html>
