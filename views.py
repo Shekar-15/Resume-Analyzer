@@ -11,7 +11,7 @@ import json
 
 # Configure Google AI
 # Get your free API key from: https://aistudio.google.com/app/apikey
-GOOGLE_API_KEY = 'AIzaSyDoiOzVAyUIvW_tlQF18s1tRC00m-oiNl0'
+GOOGLE_API_KEY = 'AIzaSyCFhwIWXdnBt5Gsh3iXiHnFlM75he8JDQQ'
 genai.configure(api_key=GOOGLE_API_KEY)
 
 # Create uploads folder
@@ -51,12 +51,12 @@ def extract_image_text(image_file):
         return None
 
 def analyze_with_ai(resume_text, job_description):
-    """Analyze resume using Google AI - Basic Python"""
+    """Analyze resume using Google AI - Detailed Analysis"""
     try:
         print("Starting AI analysis...")
         model = genai.GenerativeModel('models/gemini-2.5-flash')
         
-        prompt = """You are an expert ATS (Applicant Tracking System) analyzer. Analyze the following resume against the job description.
+        prompt = """You are an expert ATS (Applicant Tracking System) and Hiring Manager. Analyze the following resume against the job description with extreme detail.
 
 RESUME:
 """ + resume_text + """
@@ -64,44 +64,86 @@ RESUME:
 JOB DESCRIPTION:
 """ + job_description + """
 
-Return a JSON response with this structure:
+Provide a COMPREHENSIVE analysis in JSON format with the following structure:
 {
+    "candidate_name": "Full Name",
     "contact_details": {
-        "name": "candidate name",
         "email": "email address",
         "phone": "phone number",
         "location": "location"
     },
-    "skills": ["skill1", "skill2", "skill3"],
-    "experience": {
-        "total_years": "number of years",
-        "summary": "brief experience summary",
-        "key_roles": ["role1", "role2"]
+    "overall_fit_percentage": 0-100,
+    "fit_status": "STRONG MATCH / PARTIAL MATCH / WEAK MATCH",
+    "profile_type": "Professional title/description",
+    "primary_background": "Main background summary",
+    "primary_gap": "Biggest gap or weakness",
+    
+    "dimension_analysis": {
+        "dimension_1": {
+            "title": "Industry/Domain Experience",
+            "rating": 0-5,
+            "alignment": "Strong/Moderate/Weak/Low",
+            "details": "3-4 paragraph detailed analysis",
+            "key_points": ["point1", "point2", "point3"]
+        },
+        "dimension_2": {
+            "title": "Supply Chain/Core Function Scope",
+            "rating": 0-5,
+            "alignment": "Strong/Moderate/Weak/Low",
+            "details": "3-4 paragraph detailed analysis",
+            "key_points": ["point1", "point2", "point3"]
+        },
+        "dimension_3": {
+            "title": "Leadership & Organizational Scope",
+            "rating": 0-5,
+            "alignment": "Strong/Moderate/Weak/Low",
+            "details": "3-4 paragraph detailed analysis",
+            "key_points": ["point1", "point2", "point3"]
+        },
+        "dimension_4": {
+            "title": "Technical/Regulatory Knowledge",
+            "rating": 0-5,
+            "alignment": "Strong/Moderate/Weak/Low",
+            "details": "3-4 paragraph detailed analysis",
+            "key_points": ["point1", "point2", "point3"]
+        },
+        "dimension_5": {
+            "title": "Systems & Tools Experience",
+            "rating": 0-5,
+            "alignment": "Strong/Moderate/Weak/Low",
+            "details": "3-4 paragraph detailed analysis",
+            "key_points": ["point1", "point2", "point3"]
+        },
+        "dimension_6": {
+            "title": "Strategic Planning Capability",
+            "rating": 0-5,
+            "alignment": "Strong/Moderate/Weak/Low",
+            "details": "3-4 paragraph detailed analysis",
+            "key_points": ["point1", "point2", "point3"]
+        }
     },
-    "key_responsibilities": ["responsibility1", "responsibility2"],
-    "technical_skills": {
-        "category1": ["skill1", "skill2"],
-        "category2": ["skill3", "skill4"]
+    
+    "scorecard": {
+        "technical_expertise": 0-5,
+        "domain_knowledge": 0-5,
+        "leadership_scope": 0-5,
+        "experience_match": 0-5,
+        "cultural_fit": 0-5
     },
-    "metrics": {
-        "technical_depth": 0-100,
-        "leadership": 0-100,
-        "experience_match": 0-100,
-        "skills_match": 0-100
-    },
-    "fit_for_role": true/false,
-    "fit_percentage": 0-100,
-    "advantages": ["advantage1", "advantage2"],
-    "disadvantages": ["disadvantage1", "disadvantage2"]
+    
+    "strengths": ["strength1", "strength2", "strength3"],
+    "weaknesses": ["weakness1", "weakness2", "weakness3"],
+    "risks": ["risk1", "risk2"],
+    "risk_level": "Low/Moderate/High",
+    
+    "recommendation": {
+        "decision": "RECOMMENDED / NOT RECOMMENDED / CONDITIONAL",
+        "reasoning": "2-3 sentence summary",
+        "ideal_roles": ["Alternative role 1", "Alternative role 2"]
+    }
 }
 
-Calculate metrics based on:
-- technical_depth: How deep the technical expertise is
-- leadership: Leadership experience and qualities
-- experience_match: How well experience aligns with job requirements
-- skills_match: Percentage of required skills that match
-
-Return ONLY valid JSON, no markdown formatting."""
+Analyze comprehensively across ALL dimensions. Return ONLY valid JSON."""
         
         print("Sending request to AI...")
         response = model.generate_content(prompt)
@@ -131,12 +173,13 @@ Return ONLY valid JSON, no markdown formatting."""
 
 @csrf_exempt
 def analyze(request):
-    """Handle resume analysis - Basic Python"""
+    """Handle multiple resume analysis - Up to 10 resumes"""
     if request.method != 'POST':
         return JsonResponse({'error': 'Only POST method allowed'}, status=405)
     
     try:
-        print("\n=== New analysis request ===")
+        print("\n=== New multi-resume analysis request ===")
+        
         # Get job description from form
         job_description = request.POST.get('job_description', '')
         if not job_description:
@@ -144,43 +187,103 @@ def analyze(request):
         
         print("Job description length:", len(job_description))
         
-        # Get resume file
-        resume_file = request.FILES.get('resume')
-        if not resume_file:
-            return JsonResponse({'error': 'Resume file is required'}, status=400)
+        # Get all resume files (support multiple files)
+        resume_files = request.FILES.getlist('resumes')
         
-        print("Resume file:", resume_file.name)
+        if not resume_files:
+            return JsonResponse({'error': 'At least one resume file is required'}, status=400)
         
-        # Get filename
-        filename = resume_file.name.lower()
-        resume_text = None
+        if len(resume_files) > 10:
+            return JsonResponse({'error': 'Maximum 10 resumes allowed'}, status=400)
         
-        # Check file type and extract text - Basic Python
-        if filename.endswith('.pdf'):
-            print("Processing PDF file...")
-            resume_text = extract_pdf_text(resume_file)
-        elif filename.endswith('.png') or filename.endswith('.jpg') or filename.endswith('.jpeg') or filename.endswith('.gif') or filename.endswith('.bmp'):
-            print("Processing image file...")
-            resume_text = extract_image_text(resume_file)
-        else:
-            return JsonResponse({'error': 'Unsupported file format. Please use PDF or Image.'}, status=400)
+        print(f"Processing {len(resume_files)} resumes...")
         
-        if not resume_text:
-            return JsonResponse({'error': 'Could not extract text from resume. Please check if the file is readable.'}, status=400)
+        results = []
         
-        if len(resume_text) < 50:
-            return JsonResponse({'error': 'Resume text too short. Please upload a valid resume.'}, status=400)
+        # Process each resume
+        for idx, resume_file in enumerate(resume_files):
+            print(f"\n--- Processing resume {idx + 1}/{len(resume_files)}: {resume_file.name} ---")
+            
+            try:
+                # Get filename
+                filename = resume_file.name.lower()
+                resume_text = None
+                
+                # Check file type and extract text
+                if filename.endswith('.pdf'):
+                    print("Processing PDF file...")
+                    resume_text = extract_pdf_text(resume_file)
+                elif filename.endswith('.png') or filename.endswith('.jpg') or filename.endswith('.jpeg') or filename.endswith('.gif') or filename.endswith('.bmp'):
+                    print("Processing image file...")
+                    resume_text = extract_image_text(resume_file)
+                else:
+                    print(f"Skipping unsupported file: {resume_file.name}")
+                    results.append({
+                        'filename': resume_file.name,
+                        'error': 'Unsupported file format',
+                        'status': 'failed'
+                    })
+                    continue
+                
+                if not resume_text or len(resume_text) < 50:
+                    print(f"Could not extract valid text from: {resume_file.name}")
+                    results.append({
+                        'filename': resume_file.name,
+                        'error': 'Could not extract text or text too short',
+                        'status': 'failed'
+                    })
+                    continue
+                
+                print(f"Resume text extracted, length: {len(resume_text)}")
+                
+                # Analyze resume with AI
+                analysis = analyze_with_ai(resume_text, job_description)
+                
+                if not analysis:
+                    print(f"AI analysis failed for: {resume_file.name}")
+                    results.append({
+                        'filename': resume_file.name,
+                        'error': 'AI analysis failed',
+                        'status': 'failed'
+                    })
+                    continue
+                
+                # Add metadata
+                analysis['filename'] = resume_file.name
+                analysis['status'] = 'success'
+                analysis['resume_id'] = idx + 1
+                results.append(analysis)
+                print(f"Resume {idx + 1} analyzed successfully!")
+                
+            except Exception as e:
+                print(f"Error processing {resume_file.name}: {str(e)}")
+                results.append({
+                    'filename': resume_file.name,
+                    'error': str(e),
+                    'status': 'failed'
+                })
         
-        print("Resume text extracted, length:", len(resume_text))
+        # Rank results by overall_fit_percentage
+        successful_results = [r for r in results if r.get('status') == 'success']
+        failed_results = [r for r in results if r.get('status') == 'failed']
         
-        # Analyze resume with AI
-        analysis = analyze_with_ai(resume_text, job_description)
+        # Sort by overall fit percentage (descending)
+        successful_results.sort(key=lambda x: x.get('overall_fit_percentage', 0), reverse=True)
         
-        if not analysis:
-            return JsonResponse({'error': 'AI analysis failed. Please check the terminal for details or try again.'}, status=500)
+        # Add ranking
+        for idx, result in enumerate(successful_results):
+            result['rank'] = idx + 1
         
-        print("Analysis completed successfully!")
-        return JsonResponse(analysis)
+        print(f"\n=== Analysis complete: {len(successful_results)} successful, {len(failed_results)} failed ===")
+        
+        return JsonResponse({
+            'total_resumes': len(resume_files),
+            'successful': len(successful_results),
+            'failed': len(failed_results),
+            'results': successful_results,
+            'failed_resumes': failed_results,
+            'top_5': successful_results[:5]
+        })
         
     except Exception as error:
         error_message = str(error)
