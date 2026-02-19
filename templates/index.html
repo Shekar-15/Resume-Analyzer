@@ -91,7 +91,6 @@
                                         <polyline points="13 2 13 9 20 9"></polyline>
                                     </svg>
                                     Upload Resumes
-                                    <span class="label-badge">Max 10 files</span>
                                 </label>
                                 
                                 <div class="multi-file-input-wrapper">
@@ -239,25 +238,20 @@ Required skills, experience, qualifications, responsibilities, etc." required></
                                 <line x1="12" y1="20" x2="12" y2="4"></line>
                                 <line x1="6" y1="20" x2="6" y2="14"></line>
                             </svg>
-                            Select Candidates to Compare
+                            Compare Candidate with All Others
                         </h3>
-                        <div class="comparison-controls">
-                            <div class="select-group">
-                                <label>Candidate 1</label>
+                        <div class="comparison-filter">
+                            <label class="filter-label">Show:</label>
+                            <div class="filter-options">
+                                <button class="filter-btn active" onclick="filterComparisonCandidates('top5')" id="filterTop5">Top 5</button>
+                                <button class="filter-btn" onclick="filterComparisonCandidates('all')" id="filterAll">All Candidates</button>
+                            </div>
+                        </div>
+                        <div class="comparison-controls single-select">
+                            <div class="select-group full-width">
+                                <label>Select Candidate to Compare</label>
                                 <div class="select-wrapper">
                                     <select id="compareSelect1" class="compare-select">
-                                        <option value="">Choose candidate...</option>
-                                    </select>
-                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                        <polyline points="6 9 12 15 18 9"></polyline>
-                                    </svg>
-                                </div>
-                            </div>
-                            <div class="vs-divider">VS</div>
-                            <div class="select-group">
-                                <label>Top 5 Candidates</label>
-                                <div class="select-wrapper">
-                                    <select id="compareSelect2" class="compare-select">
                                         <option value="">Choose candidate...</option>
                                     </select>
                                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -269,7 +263,7 @@ Required skills, experience, qualifications, responsibilities, etc." required></
                                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                     <polyline points="20 6 9 17 4 12"></polyline>
                                 </svg>
-                                Compare Now
+                                Compare with All
                             </button>
                         </div>
                     </div>

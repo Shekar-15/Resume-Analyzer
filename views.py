@@ -11,7 +11,7 @@ import json
 
 # Configure Google AI
 # Get your free API key from: https://aistudio.google.com/app/apikey
-GOOGLE_API_KEY = 'AIzaSyCFhwIWXdnBt5Gsh3iXiHnFlM75he8JDQQ'
+GOOGLE_API_KEY = 'AIzaSyDEz91q6T18LSP2Xy7AVjzoEUuuCdUCmT0'
 genai.configure(api_key=GOOGLE_API_KEY)
 
 # Create uploads folder
@@ -56,7 +56,27 @@ def analyze_with_ai(resume_text, job_description):
         print("Starting AI analysis...")
         model = genai.GenerativeModel('models/gemini-2.5-flash')
         
-        prompt = """You are an expert ATS (Applicant Tracking System) and Hiring Manager. Analyze the following resume against the job description with extreme detail.
+        prompt = """ROLE: Act as a senior technical recruiter and hiring manager.
+
+OBJECTIVE: Analyze the candidate resume and generate a concise, enterprise-grade recruiter evaluation report in structured executive hiring assessment format.
+
+CRITICAL OUTPUT RULES (MANDATORY):
+• The report must be concise and executive-level
+• Maintain strict professional recruiter tone
+• Do NOT use placeholders (e.g., dimension_1)
+• Do NOT copy supply-chain wording unless the resume truly matches that domain
+• Automatically adapt section wording to match the candidate's target role/domain
+• Every numbered section must contain 2-4 crisp bullets only
+• Ensure score and narrative are logically consistent
+• Avoid leadership score inflation for freshers
+• Output must be submission-ready for hiring managers
+
+SCORING GUIDELINES (VERY IMPORTANT):
+• Freshers typically: 60-80%
+• Strong junior: 75-88%
+• Senior strong match: 85-95%
+• Major mismatch: ≤60%
+Never inflate scores.
 
 RESUME:
 """ + resume_text + """
@@ -64,7 +84,16 @@ RESUME:
 JOB DESCRIPTION:
 """ + job_description + """
 
-Provide a COMPREHENSIVE analysis in JSON format with the following structure:
+Generate role-relevant section headings automatically based on the candidate's domain.
+
+Examples:
+IF Cloud/DevOps → use: Cloud/Infrastructure Experience, DevOps & Automation, CI/CD & Containers, Monitoring & Observability
+IF Supply Chain → use: Industry/Domain Experience, Supply Chain Scope, ERP/SAP, Supplier Management
+IF Software Developer → use: Programming Expertise, System Design, Backend/Frontend Depth, DevOps Exposure
+
+Headings must be domain-appropriate, not generic.
+
+Return ONLY valid JSON in this EXACT structure:
 {
     "candidate_name": "Full Name",
     "contact_details": {
@@ -75,75 +104,102 @@ Provide a COMPREHENSIVE analysis in JSON format with the following structure:
     "overall_fit_percentage": 0-100,
     "fit_status": "STRONG MATCH / PARTIAL MATCH / WEAK MATCH",
     "profile_type": "Professional title/description",
-    "primary_background": "Main background summary",
-    "primary_gap": "Biggest gap or weakness",
+    "primary_background": "Main background summary paragraph",
+    "primary_gap": "Biggest gap or weakness paragraph",
     
     "dimension_analysis": {
-        "dimension_1": {
-            "title": "Industry/Domain Experience",
+        "Domain-Appropriate Heading 1": {
+            "title": "Domain-Appropriate Heading 1",
             "rating": 0-5,
-            "alignment": "Strong/Moderate/Weak/Low",
-            "details": "3-4 paragraph detailed analysis",
-            "key_points": ["point1", "point2", "point3"]
+            "alignment": "Strong/Moderate/Low",
+            "key_points": ["bullet 1", "bullet 2", "bullet 3"],
+            "verdict": "One line arrow assessment"
         },
-        "dimension_2": {
-            "title": "Supply Chain/Core Function Scope",
+        "Domain-Appropriate Heading 2": {
+            "title": "Domain-Appropriate Heading 2",
             "rating": 0-5,
-            "alignment": "Strong/Moderate/Weak/Low",
-            "details": "3-4 paragraph detailed analysis",
-            "key_points": ["point1", "point2", "point3"]
+            "alignment": "Strong/Moderate/Low",
+            "key_points": ["bullet 1", "bullet 2"],
+            "verdict": "One line arrow assessment"
         },
-        "dimension_3": {
-            "title": "Leadership & Organizational Scope",
+        "Domain-Appropriate Heading 3": {
+            "title": "Domain-Appropriate Heading 3",
             "rating": 0-5,
-            "alignment": "Strong/Moderate/Weak/Low",
-            "details": "3-4 paragraph detailed analysis",
-            "key_points": ["point1", "point2", "point3"]
+            "alignment": "Strong/Moderate/Low",
+            "key_points": ["bullet 1", "bullet 2", "bullet 3"],
+            "verdict": "One line arrow assessment"
         },
-        "dimension_4": {
-            "title": "Technical/Regulatory Knowledge",
+        "Domain-Appropriate Heading 4": {
+            "title": "Domain-Appropriate Heading 4",
             "rating": 0-5,
-            "alignment": "Strong/Moderate/Weak/Low",
-            "details": "3-4 paragraph detailed analysis",
-            "key_points": ["point1", "point2", "point3"]
+            "alignment": "Strong/Moderate/Low",
+            "key_points": ["bullet 1", "bullet 2"],
+            "verdict": "One line arrow assessment"
         },
-        "dimension_5": {
-            "title": "Systems & Tools Experience",
+        "Domain-Appropriate Heading 5": {
+            "title": "Domain-Appropriate Heading 5",
             "rating": 0-5,
-            "alignment": "Strong/Moderate/Weak/Low",
-            "details": "3-4 paragraph detailed analysis",
-            "key_points": ["point1", "point2", "point3"]
+            "alignment": "Strong/Moderate/Low",
+            "key_points": ["bullet 1", "bullet 2", "bullet 3"],
+            "verdict": "One line arrow assessment"
         },
-        "dimension_6": {
-            "title": "Strategic Planning Capability",
+        "Domain-Appropriate Heading 6": {
+            "title": "Domain-Appropriate Heading 6",
             "rating": 0-5,
-            "alignment": "Strong/Moderate/Weak/Low",
-            "details": "3-4 paragraph detailed analysis",
-            "key_points": ["point1", "point2", "point3"]
+            "alignment": "Strong/Moderate/Low",
+            "key_points": ["bullet 1", "bullet 2"],
+            "verdict": "One line arrow assessment"
+        },
+        "Domain-Appropriate Heading 7": {
+            "title": "Domain-Appropriate Heading 7",
+            "rating": 0-5,
+            "alignment": "Strong/Moderate/Low",
+            "key_points": ["bullet 1", "bullet 2"],
+            "verdict": "One line arrow assessment"
+        },
+        "Domain-Appropriate Heading 8": {
+            "title": "Domain-Appropriate Heading 8",
+            "rating": 0-5,
+            "alignment": "Strong/Moderate/Low",
+            "key_points": ["bullet 1", "bullet 2"],
+            "verdict": "One line arrow assessment"
+        },
+        "Role Fit": {
+            "title": "Role Fit",
+            "rating": 0-5,
+            "alignment": "Strong/Moderate/Low",
+            "strength_areas": ["strength 1", "strength 2"],
+            "watch_areas": ["concern 1", "concern 2"],
+            "verdict": "Overall role fit statement"
+        },
+        "Risks / Considerations": {
+            "title": "Risks / Considerations",
+            "rating": 0-5,
+            "alignment": "Strong/Moderate/Low",
+            "key_points": ["ramp-up risk", "skill gap", "other consideration"],
+            "risk_level": "Low/Moderate/High",
+            "verdict": "Overall risk assessment"
         }
     },
     
     "scorecard": {
-        "technical_expertise": 0-5,
+        "technical_functional_expertise": 0-5,
         "domain_knowledge": 0-5,
+        "tools_systems": 0-5,
+        "execution_capability": 0-5,
         "leadership_scope": 0-5,
-        "experience_match": 0-5,
-        "cultural_fit": 0-5
+        "overall_fit": 0-5
     },
     
-    "strengths": ["strength1", "strength2", "strength3"],
-    "weaknesses": ["weakness1", "weakness2", "weakness3"],
-    "risks": ["risk1", "risk2"],
-    "risk_level": "Low/Moderate/High",
+    "hiring_manager_assessment": "Short executive paragraph summarizing true readiness for the role",
     
     "recommendation": {
-        "decision": "RECOMMENDED / NOT RECOMMENDED / CONDITIONAL",
-        "reasoning": "2-3 sentence summary",
-        "ideal_roles": ["Alternative role 1", "Alternative role 2"]
+        "decision": "RECOMMENDED / CONDITIONAL / NOT RECOMMENDED",
+        "reasoning": "2-3 sentence summary matching the score"
     }
 }
 
-Analyze comprehensively across ALL dimensions. Return ONLY valid JSON."""
+Return ONLY valid JSON. No markdown, no code blocks, just pure JSON."""
         
         print("Sending request to AI...")
         response = model.generate_content(prompt)
@@ -192,9 +248,6 @@ def analyze(request):
         
         if not resume_files:
             return JsonResponse({'error': 'At least one resume file is required'}, status=400)
-        
-        if len(resume_files) > 10:
-            return JsonResponse({'error': 'Maximum 10 resumes allowed'}, status=400)
         
         print(f"Processing {len(resume_files)} resumes...")
         
