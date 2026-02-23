@@ -8,10 +8,11 @@ from PIL import Image
 import io
 import PyPDF2
 import json
+import time  # For Gemini API rate limiting
 
 # Configure Google AI
 # Get your free API key from: https://aistudio.google.com/app/apikey
-GOOGLE_API_KEY = 'AIzaSyDEz91q6T18LSP2Xy7AVjzoEUuuCdUCmT0'
+GOOGLE_API_KEY = 'AIzaSyClWFAQEpcWxaQyix3UJFHumOLEZPjNcCo'
 genai.configure(api_key=GOOGLE_API_KEY)
 
 # Create uploads folder
@@ -229,7 +230,7 @@ Return ONLY valid JSON. No markdown, no code blocks, just pure JSON."""
 
 @csrf_exempt
 def analyze(request):
-    """Handle multiple resume analysis - Up to 10 resumes"""
+    """Handle multiple resume analysis - Up to 50 resumes with 5MB per file limit"""
     if request.method != 'POST':
         return JsonResponse({'error': 'Only POST method allowed'}, status=405)
     
@@ -249,7 +250,34 @@ def analyze(request):
         if not resume_files:
             return JsonResponse({'error': 'At least one resume file is required'}, status=400)
         
-        print(f"Processing {len(resume_files)} resumes...")
+        # FAANG-LEVEL BACKEND VALIDATION
+        MAX_FILES = 500
+        MAX_FILE_SIZE = 5 * 1024 * 1024  # 5MB in bytes
+        ALLOWED_EXTENSIONS = ['pdf', 'png', 'jpg', 'jpeg', 'gif', 'bmp']
+        
+        # Validate file count
+        if len(resume_files) > MAX_FILES:
+            return JsonResponse({
+                'error': f'Too many files. Maximum {MAX_FILES} files allowed. Received {len(resume_files)} files.'
+            }, status=400)
+        
+        # Validate each file size and type
+        for resume_file in resume_files:
+            # Check file size
+            if resume_file.size > MAX_FILE_SIZE:
+                file_size_mb = round(resume_file.size / (1024 * 1024), 2)
+                return JsonResponse({
+                    'error': f'File too large: {resume_file.name} ({file_size_mb}MB). Maximum 5MB per file allowed.'
+                }, status=400)
+            
+            # Check file type
+            file_extension = resume_file.name.lower().split('.')[-1]
+            if file_extension not in ALLOWED_EXTENSIONS:
+                return JsonResponse({
+                    'error': f'Invalid file type: {resume_file.name}. Allowed types: {", ".join(ALLOWED_EXTENSIONS)}'
+                }, status=400)
+        
+        print(f"Validation passed: Processing {len(resume_files)} resumes...")
         
         results = []
         
@@ -308,6 +336,10 @@ def analyze(request):
                 results.append(analysis)
                 print(f"Resume {idx + 1} analyzed successfully!")
                 
+                # CRITICAL: Rate limiting for Gemini API
+                # Sleep 0.8 seconds to prevent API throttling during bulk uploads
+                time.sleep(0.8)
+                
             except Exception as e:
                 print(f"Error processing {resume_file.name}: {str(e)}")
                 results.append({
@@ -315,6 +347,8 @@ def analyze(request):
                     'error': str(e),
                     'status': 'failed'
                 })
+                # Rate limiting even on failures
+                time.sleep(0.5)
         
         # Rank results by overall_fit_percentage
         successful_results = [r for r in results if r.get('status') == 'success']

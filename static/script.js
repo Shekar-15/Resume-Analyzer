@@ -1,6 +1,402 @@
-// Global variables
+// ========================================
+// FAANG-LEVEL FILE UPLOAD SYSTEM
+// ========================================
+
+console.log('🚀 ResumeAI Script v2.1 - LOADED ✅');
+console.log('📅 Loaded at:', new Date().toLocaleTimeString());
+console.log('✅ Comparison feature fixed!');
+
+// Global upload management
 let analysisResults = [];
-let selectedFiles = [];
+let uploadQueue = new Map(); // fileId -> {file, hash, status, progress}
+let fileHashCache = new Set(); // For O(1) duplicate detection
+let activeUploads = 0;
+
+// Configuration constants
+const MAX_FILES = 500;
+const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB in bytes
+const PARALLEL_UPLOADS = 3;
+const ALLOWED_TYPES = ['.pdf', '.png', '.jpg', '.jpeg', '.gif', '.bmp'];
+
+// ========================================
+// SHA-256 FILE HASHING FOR DEDUPLICATION
+// ========================================
+async function generateFileHash(file) {
+    try {
+        const buffer = await file.arrayBuffer();
+        const hashBuffer = await crypto.subtle.digest('SHA-256', buffer);
+        const hashArray = Array.from(new Uint8Array(hashBuffer));
+        const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+        return hashHex;
+    } catch (error) {
+        console.error('Hash generation failed:', error);
+        // Fallback to name+size for older browsers
+        return `${file.name}_${file.size}`;
+    }
+}
+
+// ========================================
+// FILE VALIDATION
+// ========================================
+function validateFile(file) {
+    // Check file size
+    if (file.size > MAX_FILE_SIZE) {
+        return {
+            valid: false,
+            error: `File too large: ${file.name} (max 5MB)`
+        };
+    }
+    
+    // Check file type
+    const fileName = file.name.toLowerCase();
+    const isValidType = ALLOWED_TYPES.some(type => fileName.endsWith(type));
+    
+    if (!isValidType) {
+        return {
+            valid: false,
+            error: `Invalid file type: ${file.name}`
+        };
+    }
+    
+    return { valid: true };
+}
+
+// ========================================
+// UPLOAD QUEUE MANAGEMENT
+// ========================================
+async function handleFiles(files) {
+    console.log(`Processing ${files.length} files...`);
+    
+    const filesArray = Array.from(files);
+    let addedCount = 0;
+    let skippedCount = 0;
+    let errorCount = 0;
+    
+    for (const file of filesArray) {
+        // Check max files limit
+        if (uploadQueue.size >= MAX_FILES) {
+            showToast(`Maximum ${MAX_FILES} files allowed`, 'error');
+            break;
+        }
+        
+        // Validate file
+        const validation = validateFile(file);
+        if (!validation.valid) {
+            showToast(validation.error, 'error');
+            errorCount++;
+            continue;
+        }
+        
+        // Generate hash for duplicate detection
+        const hash = await generateFileHash(file);
+        
+        // Check if duplicate
+        if (fileHashCache.has(hash)) {
+            console.log(`Duplicate detected: ${file.name}`);
+            skippedCount++;
+            continue;
+        }
+        
+        // Add to queue
+        const fileId = `file_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        uploadQueue.set(fileId, {
+            id: fileId,
+            file: file,
+            hash: hash,
+            status: 'queued', // queued, uploading, done, failed
+            progress: 0,
+            error: null
+        });
+        
+        fileHashCache.add(hash);
+        addedCount++;
+        console.log(`Added: ${file.name} (${formatFileSize(file.size)})`);
+    }
+    
+    // User feedback
+    if (addedCount > 0) {
+        showToast(`${addedCount} file${addedCount > 1 ? 's' : ''} added to queue`, 'success');
+    }
+    if (skippedCount > 0) {
+        showToast(`${skippedCount} duplicate${skippedCount > 1 ? 's' : ''} skipped`, 'info');
+    }
+    
+    // Render the queue
+    renderUploadQueue();
+}
+
+function removeFromQueue(fileId) {
+    const item = uploadQueue.get(fileId);
+    if (item) {
+        // Remove from hash cache
+        fileHashCache.delete(item.hash);
+        // Remove from queue
+        uploadQueue.delete(fileId);
+        console.log(`Removed from queue: ${item.file.name}`);
+        renderUploadQueue();
+        showToast('File removed', 'info');
+    }
+}
+
+function clearQueue() {
+    uploadQueue.clear();
+    fileHashCache.clear();
+    activeUploads = 0;
+    renderUploadQueue();
+}
+
+// ========================================
+// UI RENDERING
+// ========================================
+function renderUploadQueue() {
+    const filePreviewList = document.getElementById('filePreviewList');
+    filePreviewList.innerHTML = '';
+    
+    if (uploadQueue.size === 0) {
+        filePreviewList.style.display = 'none';
+        return;
+    }
+    
+    filePreviewList.style.display = 'block';
+    
+    // Render each file in queue
+    uploadQueue.forEach((item, fileId) => {
+        const fileItem = document.createElement('div');
+        fileItem.className = 'file-preview-item';
+        fileItem.dataset.fileId = fileId;
+        
+        // Status icon
+        let statusIcon = '';
+        if (item.status === 'done') {
+            statusIcon = `
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                    <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                </svg>
+            `;
+        } else if (item.status === 'failed') {
+            statusIcon = `
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <line x1="15" y1="9" x2="9" y2="15"></line>
+                    <line x1="9" y1="9" x2="15" y2="15"></line>
+                </svg>
+            `;
+        } else if (item.status === 'uploading') {
+            statusIcon = `
+                <svg class="spinner" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="12" y1="2" x2="12" y2="6"></line>
+                    <line x1="12" y1="18" x2="12" y2="22"></line>
+                    <line x1="4.93" y1="4.93" x2="7.76" y2="7.76"></line>
+                    <line x1="16.24" y1="16.24" x2="19.07" y2="19.07"></line>
+                    <line x1="2" y1="12" x2="6" y2="12"></line>
+                    <line x1="18" y1="12" x2="22" y2="12"></line>
+                    <line x1="4.93" y1="19.07" x2="7.76" y2="16.24"></line>
+                    <line x1="16.24" y1="7.76" x2="19.07" y2="4.93"></line>
+                </svg>
+            `;
+        } else {
+            statusIcon = `
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                    <polyline points="14 2 14 8 20 8"></polyline>
+                </svg>
+            `;
+        }
+        
+        fileItem.innerHTML = `
+            <div class="file-icon ${item.status}">
+                ${statusIcon}
+            </div>
+            <div class="file-info">
+                <div class="file-name">${item.file.name}</div>
+                <div class="file-meta">
+                    <span class="file-size">${formatFileSize(item.file.size)}</span>
+                    <span class="file-status">${item.status}</span>
+                    ${item.error ? `<span class="file-error">${item.error}</span>` : ''}
+                </div>
+                ${item.status === 'uploading' || item.status === 'done' ? `
+                    <div class="progress-bar">
+                        <div class="progress-fill" style="width: ${item.progress}%"></div>
+                    </div>
+                ` : ''}
+            </div>
+            ${item.status === 'queued' || item.status === 'failed' ? `
+                <button type="button" class="file-remove" onclick="removeFromQueue('${fileId}')">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+            ` : ''}
+        `;
+        
+        filePreviewList.appendChild(fileItem);
+    });
+    
+    // Add summary footer
+    const queuedCount = Array.from(uploadQueue.values()).filter(item => item.status === 'queued').length;
+    
+    if (queuedCount > 0) {
+        const summaryFooter = document.createElement('div');
+        summaryFooter.className = 'upload-queue-summary';
+        summaryFooter.innerHTML = `
+            <div class="summary-text">
+                <strong>${uploadQueue.size}</strong> files in queue
+                <span class="separator">•</span>
+                <strong>${queuedCount}</strong> ready to upload
+            </div>
+            <button type="button" class="btn-clear-queue" onclick="clearQueue()">
+                Clear Queue
+            </button>
+        `;
+        filePreviewList.appendChild(summaryFooter);
+    }
+    
+    // Add "Add More Files" button
+    if (uploadQueue.size < MAX_FILES) {
+        const addMoreContainer = document.createElement('div');
+        addMoreContainer.className = 'add-more-container';
+        addMoreContainer.innerHTML = `
+            <button type="button" class="btn-add-more-files" onclick="openFileDialog('files')">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="12" y1="5" x2="12" y2="19"></line>
+                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                </svg>
+                Add More Files
+            </button>
+            <button type="button" class="btn-add-folder" onclick="openFileDialog('folder')">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+                </svg>
+                Add Folder
+            </button>
+        `;
+        filePreviewList.appendChild(addMoreContainer);
+    }
+}
+
+// ========================================
+// PARALLEL UPLOAD PROCESSOR
+// ========================================
+async function processUploadQueue(formDataBase) {
+    console.log('🚀 Starting upload queue processing...');
+    
+    const queuedItems = Array.from(uploadQueue.values()).filter(item => item.status === 'queued');
+    
+    console.log(`📋 Found ${queuedItems.length} queued items out of ${uploadQueue.size} total`);
+    
+    if (queuedItems.length === 0) {
+        console.warn('⚠️ No queued items to upload');
+        // Log all items and their statuses for debugging
+        uploadQueue.forEach((item, id) => {
+            console.log(`  File: ${item.file.name}, Status: ${item.status}`);
+        });
+        return;
+    }
+    
+    for (const item of queuedItems) {
+        // Wait if we've reached parallel upload limit
+        while (activeUploads >= PARALLEL_UPLOADS) {
+            await new Promise(resolve => setTimeout(resolve, 100));
+        }
+        
+        // Start upload
+        uploadSingleFile(item, formDataBase);
+    }
+}
+
+async function uploadSingleFile(item, formDataBase) {
+    activeUploads++;
+    item.status = 'uploading';
+    item.progress = 0;
+    renderUploadQueue();
+    
+    return new Promise((resolve) => {
+        const xhr = new XMLHttpRequest();
+        const formData = new FormData();
+        
+        // Copy base form data (job_description)
+        for (let [key, value] of formDataBase.entries()) {
+            formData.append(key, value);
+        }
+        
+        // Add single file
+        formData.append('resumes', item.file);
+        
+        // Progress tracking
+        xhr.upload.addEventListener('progress', (e) => {
+            if (e.lengthComputable) {
+                item.progress = Math.round((e.loaded / e.total) * 100);
+                updateFileProgress(item.id, item.progress);
+            }
+        });
+        
+        // Upload complete
+        xhr.addEventListener('load', () => {
+            activeUploads--;
+            
+            if (xhr.status === 200) {
+                item.status = 'done';
+                item.progress = 100;
+                console.log(`Upload successful: ${item.file.name}`);
+                
+                // CRITICAL FIX: Capture and store the analysis result
+                try {
+                    const response = JSON.parse(xhr.responseText);
+                    console.log('✅ Response received:', response);
+                    if (response.results && response.results.length > 0) {
+                        // Extract the first result (since we're uploading one file at a time)
+                        const analysis = response.results[0];
+                        analysis.resume_id = item.id; // Use item.id as unique identifier
+                        analysisResults.push(analysis);
+                        console.log(`✅ Analysis result captured for: ${item.file.name}`);
+                        console.log(`📊 Total results captured so far: ${analysisResults.length}`);
+                    } else {
+                        console.warn('⚠️ No results in response:', response);
+                    }
+                } catch (e) {
+                    console.error(`❌ Failed to parse response for ${item.file.name}:`, e);
+                    console.error('Raw response:', xhr.responseText);
+                }
+            } else {
+                item.status = 'failed';
+                item.error = 'Upload failed';
+                console.error(`Upload failed: ${item.file.name}`);
+            }
+            
+            renderUploadQueue();
+            resolve();
+            
+            // Continue processing queue
+            processUploadQueue(formDataBase);
+        });
+        
+        // Upload error
+        xhr.addEventListener('error', () => {
+            activeUploads--;
+            item.status = 'failed';
+            item.error = 'Network error';
+            console.error(`Upload error: ${item.file.name}`);
+            renderUploadQueue();
+            resolve();
+        });
+        
+        // Send request
+        xhr.open('POST', '/analyze', true);
+        xhr.send(formData);
+    });
+}
+
+function updateFileProgress(fileId, progress) {
+    const fileElement = document.querySelector(`[data-file-id="${fileId}"]`);
+    if (fileElement) {
+        const progressFill = fileElement.querySelector('.progress-fill');
+        if (progressFill) {
+            progressFill.style.width = `${progress}%`;
+        }
+    }
+}
 
 // ========================================
 // ANIMATED COUNTER FOR HERO STATS
@@ -104,25 +500,57 @@ themeToggle.addEventListener('click', function() {
     }, 300);
 });
 
+// ========================================
+// FILE INPUT HANDLERS
+// ========================================
+
 // Multi-File Input Handler
 const fileInput = document.getElementById('resumes');
+const fileInputFolder = document.getElementById('resumes-folder');
 const fileDropZone = document.getElementById('fileDropZone');
 const filePreviewList = document.getElementById('filePreviewList');
 const browseFilesBtn = document.getElementById('browseFilesBtn');
 
-// Click to upload - both drop zone and button
-const openFileDialog = () => {
-    fileInput.click();
+// Open file dialog (folder or multi-file)
+const openFileDialog = (type = 'files') => {
+    if (type === 'folder') {
+        // Reset and click folder input
+        fileInputFolder.value = '';
+        fileInputFolder.click();
+    } else {
+        // Reset and click multi-file input
+        fileInput.value = '';
+        fileInput.click();
+    }
 };
 
-fileDropZone.addEventListener('click', openFileDialog);
+// Click handlers for drop zone and browse button
+fileDropZone.addEventListener('click', () => openFileDialog('files'));
 if (browseFilesBtn) {
     browseFilesBtn.addEventListener('click', (e) => {
         e.preventDefault();
         e.stopPropagation();
-        openFileDialog();
+        openFileDialog('files');
     });
 }
+
+// File selection - Regular file input
+fileInput.addEventListener('change', async function(e) {
+    console.log('File input change event');
+    const files = Array.from(this.files);
+    if (files.length > 0) {
+        await handleFiles(files);
+    }
+});
+
+// File selection - Folder input
+fileInputFolder.addEventListener('change', async function(e) {
+    console.log('Folder input change event');
+    const files = Array.from(this.files);
+    if (files.length > 0) {
+        await handleFiles(files);
+    }
+});
 
 // Drag and drop
 fileDropZone.addEventListener('dragover', (e) => {
@@ -134,76 +562,19 @@ fileDropZone.addEventListener('dragleave', () => {
     fileDropZone.classList.remove('drag-over');
 });
 
-fileDropZone.addEventListener('drop', (e) => {
+fileDropZone.addEventListener('drop', async (e) => {
     e.preventDefault();
     fileDropZone.classList.remove('drag-over');
     
     const files = Array.from(e.dataTransfer.files);
-    handleFiles(files);
-});
-
-// File selection change - THIS IS THE MAIN EVENT
-fileInput.addEventListener('change', function(e) {
-    console.log('File input change event fired');
-    const files = Array.from(this.files);
-    console.log('Files from input:', files.length, files.map(f => f.name));
-    
     if (files.length > 0) {
-        handleFiles(files);
+        await handleFiles(files);
     }
 });
 
-function handleFiles(files) {
-    console.log('handleFiles called with:', files.length, 'files');
-    
-    // Filter and validate files
-    if (!files || files.length === 0) {
-        console.warn('No files to handle');
-        return;
-    }
-    
-    // Store files in global variable
-    selectedFiles = Array.from(files);
-    console.log('Files stored in selectedFiles:', selectedFiles.length);
-    
-    // Display preview
-    displayFilePreview(selectedFiles);
-}
-
-function displayFilePreview(files) {
-    filePreviewList.innerHTML = '';
-    
-    if (files.length === 0) {
-        filePreviewList.style.display = 'none';
-        return;
-    }
-    
-    filePreviewList.style.display = 'block';
-    
-    files.forEach((file, index) => {
-        const item = document.createElement('div');
-        item.className = 'file-preview-item';
-        item.innerHTML = `
-            <div class="file-icon">
-                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                    <polyline points="14 2 14 8 20 8"></polyline>
-                </svg>
-            </div>
-            <div class="file-info">
-                <div class="file-name">${file.name}</div>
-                <div class="file-size">${formatFileSize(file.size)}</div>
-            </div>
-            <button type="button" class="file-remove" onclick="removeFile(${index})">
-                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <line x1="18" y1="6" x2="6" y2="18"></line>
-                    <line x1="6" y1="6" x2="18" y2="18"></line>
-                </svg>
-            </button>
-        `;
-        filePreviewList.appendChild(item);
-    });
-}
+// ========================================
+// UTILITY FUNCTIONS
+// ========================================
 
 function formatFileSize(bytes) {
     if (bytes === 0) return '0 Bytes';
@@ -213,118 +584,128 @@ function formatFileSize(bytes) {
     return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i];
 }
 
-function removeFile(index) {
-    selectedFiles.splice(index, 1);
-    
-    // Update file input
-    const dt = new DataTransfer();
-    selectedFiles.forEach(file => dt.items.add(file));
-    fileInput.files = dt.files;
-    
-    displayFilePreview(selectedFiles);
-}
+// ========================================
+// FORM SUBMISSION WITH PARALLEL UPLOADS
+// ========================================
 
 // Form submission
 document.getElementById('analyzeForm').addEventListener('submit', async function(e) {
     e.preventDefault();
     
     const analyzeBtn = document.getElementById('analyzeBtn');
-    const loader = document.getElementById('loader');
     const errorMessage = document.getElementById('errorMessage');
     
-    // Validate files are selected
-    if (!selectedFiles || selectedFiles.length === 0) {
+    // Validate upload queue
+    if (uploadQueue.size === 0) {
         showToast('Please select at least one resume file', 'error');
         return;
     }
     
-    // Show loader with modern loading state
+    // Validate job description
+    const jobDesc = document.getElementById('job_description').value;
+    if (!jobDesc || jobDesc.trim().length === 0) {
+        showToast('Please enter a job description', 'error');
+        return;
+    }
+    
+    // Show loading state
     analyzeBtn.disabled = true;
     analyzeBtn.classList.add('loading');
     errorMessage.style.display = 'none';
     
-    // Get form data
-    const formData = new FormData();
+    // Clear previous results
+    analysisResults = [];
+    console.log('🔄 Starting new analysis, cleared previous results');
     
-    // Add all resume files
-    console.log(`Adding ${selectedFiles.length} files to form data`);
-    selectedFiles.forEach((file, index) => {
-        console.log(`File ${index + 1}: ${file.name} (${file.size} bytes)`);
-        formData.append('resumes', file);
+    // CRITICAL FIX: Reset all file statuses to 'queued' for re-analysis
+    console.log('🔄 Resetting file statuses to queued...');
+    uploadQueue.forEach((item, fileId) => {
+        item.status = 'queued';
+        item.progress = 0;
+        item.error = null;
+        console.log(`  ↪️ Reset ${item.file.name} to queued`);
     });
+    renderUploadQueue();
     
-    const jobDesc = document.getElementById('job_description').value;
-    if (!jobDesc || jobDesc.trim().length === 0) {
-        showToast('Please enter a job description', 'error');
-        analyzeBtn.disabled = false;
-        analyzeBtn.classList.remove('loading');
-        return;
+    // Prepare base form data
+    const formDataBase = new FormData();
+    formDataBase.append('job_description', jobDesc);
+    
+    console.log(`Starting upload of ${uploadQueue.size} files...`);
+    
+    // Start parallel upload processing
+    await processUploadQueue(formDataBase);
+    
+    // Wait for all uploads to complete
+    while (activeUploads > 0) {
+        await new Promise(resolve => setTimeout(resolve, 500));
     }
     
-    formData.append('job_description', jobDesc);
-    console.log('Job description length:', jobDesc.length);
+    console.log('🏁 All uploads complete!');
+    console.log(`📊 Total analysisResults captured: ${analysisResults.length}`);
+    console.log('📋 analysisResults array:', analysisResults);
     
-    try {
-        console.log('Sending request to /analyze...');
-        const response = await fetch('/analyze', {
-            method: 'POST',
-            body: formData
+    // Check results
+    const successCount = Array.from(uploadQueue.values()).filter(item => item.status === 'done').length;
+    const failCount = Array.from(uploadQueue.values()).filter(item => item.status === 'failed').length;
+    
+    console.log(`✅ Success count: ${successCount}, ❌ Fail count: ${failCount}`);
+    
+    if (successCount > 0) {
+        console.log('🎉 Displaying results...');
+        showToast(`Analysis complete: ${successCount} successful, ${failCount} failed`, 'success');
+        
+        // CRITICAL FIX: Sort results by overall_fit_percentage and display them
+        analysisResults.sort((a, b) => (b.overall_fit_percentage || 0) - (a.overall_fit_percentage || 0));
+        
+        // Add ranking
+        analysisResults.forEach((result, index) => {
+            result.rank = index + 1;
         });
         
-        console.log('Response status:', response.status);
+        // Prepare data for displayResults function
+        const resultsData = {
+            total_resumes: uploadQueue.size,
+            successful: successCount,
+            failed: failCount,
+            results: analysisResults,
+            top_5: analysisResults.slice(0, 5)
+        };
         
-        const data = await response.json();
-        console.log('Response data:', data);
-        console.log('Successful:', data.successful);
-        console.log('Failed:', data.failed);
-        console.log('Failed resumes:', data.failed_resumes);
+        console.log('📦 Results data prepared:', resultsData);
         
-        if (!response.ok) {
-            throw new Error(data.error || 'Analysis failed');
+        // Display the results
+        console.log('🖼️ Calling displayResults()...');
+        displayResults(resultsData);
+        
+        // Show results section, hide upload section
+        console.log('👁️ Showing results section...');
+        const resultsSection = document.getElementById('resultsSection');
+        const uploadSection = document.getElementById('uploadSection');
+        
+        if (resultsSection && uploadSection) {
+            resultsSection.style.display = 'block';
+            uploadSection.style.display = 'none';
+            console.log('✅ Results section shown, upload section hidden');
+        } else {
+            console.error('❌ Could not find sections:', { resultsSection, uploadSection });
         }
-        
-        // Check if all resumes failed
-        if (data.failed > 0 && data.successful === 0) {
-            let errorMsg = `All ${data.failed} resume(s) failed to analyze.`;
-            if (data.failed_resumes && data.failed_resumes.length > 0) {
-                errorMsg += '\n\nErrors:\n';
-                data.failed_resumes.forEach(fr => {
-                    errorMsg += `- ${fr.filename}: ${fr.error}\n`;
-                });
-            }
-            throw new Error(errorMsg);
-        }
-        
-        // Show warning if some failed
-        if (data.failed > 0) {
-            let warningMsg = `${data.successful} resume(s) analyzed successfully, but ${data.failed} failed.`;
-            console.warn(warningMsg);
-            if (data.failed_resumes && data.failed_resumes.length > 0) {
-                console.warn('Failed resumes:', data.failed_resumes);
-            }
-        }
-        
-        // Store results globally
-        analysisResults = data.results || [];
-        
-        // Display results
-        displayResults(data);
-        
-        // Hide upload section, show results
-        document.getElementById('uploadSection').style.display = 'none';
-        document.getElementById('resultsSection').style.display = 'block';
         
         // Scroll to results
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-        
-    } catch (error) {
-        console.error('Error during analysis:', error);
-        errorMessage.textContent = error.message;
-        errorMessage.style.display = 'block';
-    } finally {
-        analyzeBtn.disabled = false;
-        analyzeBtn.classList.remove('loading');
+        setTimeout(() => {
+            if (resultsSection) {
+                resultsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                console.log('📜 Scrolled to results section');
+            }
+        }, 300);
+    } else {
+        console.error('❌ No successful uploads');
+        showToast('All uploads failed. Please try again.', 'error');
     }
+    
+    // Reset button state
+    analyzeBtn.disabled = false;
+    analyzeBtn.classList.remove('loading');
 });
 
 // ========================================
@@ -340,6 +721,12 @@ function showToast(message, type = 'error') {
         toast.textContent = message;
     }
     
+    // Remove any existing type classes
+    toast.classList.remove('toast-error', 'toast-success', 'toast-info');
+    
+    // Add the appropriate type class
+    toast.classList.add(`toast-${type}`);
+    
     toast.style.display = 'flex';
     
     // Auto hide after 5 seconds
@@ -349,8 +736,15 @@ function showToast(message, type = 'error') {
 }
 
 function displayResults(data) {
+    console.log('🎨 displayResults() called with data:', data);
+    
     // Display summary
     const summaryEl = document.getElementById('resultsSummary');
+    if (!summaryEl) {
+        console.error('❌ resultsSummary element not found!');
+        return;
+    }
+    
     summaryEl.innerHTML = `
         <div class="summary-stats">
             <div class="stat">
@@ -367,18 +761,25 @@ function displayResults(data) {
             </div>
         </div>
     `;
+    console.log('✅ Summary displayed');
     
     // Display top 5 ranking
+    console.log('📊 Calling displayRanking()...');
     displayRanking(data.top_5);
     
     // Display all candidates
+    console.log('👥 Calling displayAllCandidates()...');
     displayAllCandidates(data.results);
     
     // Setup comparison selectors
+    console.log('🔄 Setting up comparison selectors...');
     setupComparisonSelectors(data.results);
     
     // Setup tabs
+    console.log('📑 Setting up tabs...');
     setupTabs();
+    
+    console.log('✅ displayResults() completed');
 }
 
 function setupTabs() {
@@ -401,9 +802,16 @@ function setupTabs() {
 }
 
 function displayRanking(candidates) {
+    console.log('📊 displayRanking() called with', candidates?.length, 'candidates');
     const container = document.getElementById('rankingSection');
     
+    if (!container) {
+        console.error('❌ rankingSection element not found!');
+        return;
+    }
+    
     if (!candidates || candidates.length === 0) {
+        console.warn('⚠️ No candidates to rank');
         container.innerHTML = '<div class="no-results">No candidates to rank</div>';
         return;
     }
@@ -429,7 +837,7 @@ function displayRanking(candidates) {
         const avgScore = (scores.reduce((a, b) => a + b, 0) / scores.length).toFixed(1);
         
         html += `
-            <div class="ranking-card-pro ${rankClass}" onclick="showDetailModal(${candidate.resume_id})" style="animation-delay: ${index * 0.1}s">
+            <div class="ranking-card-pro ${rankClass}" onclick="showDetailModal('${candidate.resume_id}')" style="animation-delay: ${index * 0.1}s">
                 <div class="ranking-card-header-pro">
                     <div class="rank-badge-pro">
                         <span class="rank-number-pro">${candidate.rank}</span>
@@ -472,36 +880,37 @@ function displayRanking(candidates) {
                             </span>
                         </div>
                         <div class="scorecard-items-pro">
+                            <!-- Updated labels for better clarity (backend fields unchanged) -->
                             <div class="scorecard-item-pro">
-                                <span class="scorecard-item-label">Technical</span>
+                                <span class="scorecard-item-label">Technical Depth</span>
                                 <div class="scorecard-item-bar">
                                     <div class="scorecard-item-fill" style="width: ${(scorecard.technical_expertise || 0) * 20}%"></div>
                                 </div>
                                 <span class="scorecard-item-value">${scorecard.technical_expertise || 0}</span>
                             </div>
                             <div class="scorecard-item-pro">
-                                <span class="scorecard-item-label">Domain</span>
+                                <span class="scorecard-item-label">Domain Understanding</span>
                                 <div class="scorecard-item-bar">
                                     <div class="scorecard-item-fill" style="width: ${(scorecard.domain_knowledge || 0) * 20}%"></div>
                                 </div>
                                 <span class="scorecard-item-value">${scorecard.domain_knowledge || 0}</span>
                             </div>
                             <div class="scorecard-item-pro">
-                                <span class="scorecard-item-label">Leadership</span>
+                                <span class="scorecard-item-label">Problem Solving</span>
                                 <div class="scorecard-item-bar">
                                     <div class="scorecard-item-fill" style="width: ${(scorecard.leadership_scope || 0) * 20}%"></div>
                                 </div>
                                 <span class="scorecard-item-value">${scorecard.leadership_scope || 0}</span>
                             </div>
                             <div class="scorecard-item-pro">
-                                <span class="scorecard-item-label">Experience</span>
+                                <span class="scorecard-item-label">Hands-on Experience</span>
                                 <div class="scorecard-item-bar">
                                     <div class="scorecard-item-fill" style="width: ${(scorecard.experience_match || 0) * 20}%"></div>
                                 </div>
                                 <span class="scorecard-item-value">${scorecard.experience_match || 0}</span>
                             </div>
                             <div class="scorecard-item-pro">
-                                <span class="scorecard-item-label">Execution</span>
+                                <span class="scorecard-item-label">Execution Capability</span>
                                 <div class="scorecard-item-bar">
                                     <div class="scorecard-item-fill" style="width: ${(scorecard.execution_capability || 0) * 20}%"></div>
                                 </div>
@@ -517,7 +926,7 @@ function displayRanking(candidates) {
                                 <line x1="12" y1="8" x2="12" y2="12"></line>
                                 <line x1="12" y1="16" x2="12.01" y2="16"></line>
                             </svg>
-                            <span>${(candidate.primary_gap || '').substring(0, 120)}${(candidate.primary_gap?.length > 120) ? '...' : ''}</span>
+                            <span>${candidate.primary_gap || ''}</span>
                         </div>
                     ` : ''}
                 </div>
@@ -538,10 +947,17 @@ function displayRanking(candidates) {
     
     html += '</div>';
     container.innerHTML = html;
+    console.log('✅ displayRanking() completed, rendered', candidates.length, 'candidates');
 }
 
 function displayAllCandidates(candidates) {
+    console.log('👥 displayAllCandidates() called with', candidates?.length, 'candidates');
     const container = document.getElementById('allCandidatesSection');
+    
+    if (!container) {
+        console.error('❌ allCandidatesSection element not found!');
+        return;
+    }
     
     if (!candidates || candidates.length === 0) {
         container.innerHTML = '<div class="no-results">No candidates analyzed</div>';
@@ -629,13 +1045,13 @@ function displayAllCandidates(candidates) {
                         </svg>
                         <div>
                             <strong>Key Gap:</strong>
-                            <span>${(candidate.primary_gap || '').substring(0, 100)}${(candidate.primary_gap?.length > 100) ? '...' : ''}</span>
+                            <span>${candidate.primary_gap || ''}</span>
                         </div>
                     </div>
                 ` : ''}
                 
                 <div class="candidate-card-footer">
-                    <button class="btn-view-detailed" onclick="showDetailModal(${candidate.resume_id})">
+                    <button class="btn-view-detailed" onclick="showDetailModal('${candidate.resume_id}')">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
                             <circle cx="12" cy="12" r="3"></circle>
@@ -651,9 +1067,11 @@ function displayAllCandidates(candidates) {
     });
     
     container.innerHTML = html;
+    console.log('✅ displayAllCandidates() completed, rendered', topCandidates.length, 'candidates');
 }
 
 function setupComparisonSelectors(candidates) {
+    console.log('🔄 setupComparisonSelectors() called with', candidates?.length, 'candidates');
     const select1 = document.getElementById('compareSelect1');
     
     // Initially show only top 5 candidates
@@ -712,24 +1130,36 @@ function updateCompareButtonText() {
 }
 
 function compareSelected() {
-    const id1 = parseInt(document.getElementById('compareSelect1').value);
+    const selectedId = document.getElementById('compareSelect1').value;
     
-    if (!id1) {
+    console.log('🔄 compareSelected() called with ID:', selectedId);
+    
+    if (!selectedId || selectedId === '') {
         alert('Please select a candidate to compare');
         return;
     }
     
-    const selectedCandidate = analysisResults.find(c => c.resume_id === id1);
+    const selectedCandidate = analysisResults.find(c => c.resume_id === selectedId);
+    
+    if (!selectedCandidate) {
+        console.error('❌ Could not find candidate with ID:', selectedId);
+        alert('Error: Selected candidate not found');
+        return;
+    }
+    
+    console.log('✅ Found candidate:', selectedCandidate.candidate_name);
     
     // Filter other candidates based on current filter mode
     let otherCandidates;
     if (window.currentComparisonFilter === 'top5') {
         // Only compare with other candidates in top 5
         const top5 = analysisResults.slice(0, 5);
-        otherCandidates = top5.filter(c => c.resume_id !== id1);
+        otherCandidates = top5.filter(c => c.resume_id !== selectedId);
+        console.log(`📊 Comparing with ${otherCandidates.length} other top 5 candidates`);
     } else {
         // Compare with all other candidates
-        otherCandidates = analysisResults.filter(c => c.resume_id !== id1);
+        otherCandidates = analysisResults.filter(c => c.resume_id !== selectedId);
+        console.log(`📊 Comparing with ${otherCandidates.length} other candidates`);
     }
     
     displayComparisonWithAll(selectedCandidate, otherCandidates);
@@ -835,9 +1265,7 @@ function generateComparisonDetails(candidate) {
 
 function formatGap(gap) {
     if (!gap) return 'No significant gaps identified';
-    if (gap.length > 100) {
-        return gap.substring(0, 100) + '...';
-    }
+    // Return full text without truncation
     return gap;
 }
 
@@ -1203,16 +1631,17 @@ function displayComparisonWithAll(selectedCandidate, otherCandidates) {
                 <div class="comparison-scorecard-compact">
                     <div class="scorecard-compact-title">Scorecard Comparison</div>
                     <div class="scorecard-comparison-bars">
-                        ${generateComparisonBar('Technical', selectedScorecard.technical_expertise || 0, scorecard.technical_expertise || 0)}
-                        ${generateComparisonBar('Domain', selectedScorecard.domain_knowledge || 0, scorecard.domain_knowledge || 0)}
-                        ${generateComparisonBar('Leadership', selectedScorecard.leadership_scope || 0, scorecard.leadership_scope || 0)}
-                        ${generateComparisonBar('Experience', selectedScorecard.experience_match || 0, scorecard.experience_match || 0)}
-                        ${generateComparisonBar('Execution', selectedScorecard.execution_capability || 3, scorecard.execution_capability || 3)}
+                        <!-- Updated labels for consistency -->
+                        ${generateComparisonBar('Technical Depth', selectedScorecard.technical_expertise || 0, scorecard.technical_expertise || 0)}
+                        ${generateComparisonBar('Domain Understanding', selectedScorecard.domain_knowledge || 0, scorecard.domain_knowledge || 0)}
+                        ${generateComparisonBar('Problem Solving', selectedScorecard.leadership_scope || 0, scorecard.leadership_scope || 0)}
+                        ${generateComparisonBar('Hands-on Experience', selectedScorecard.experience_match || 0, scorecard.experience_match || 0)}
+                        ${generateComparisonBar('Execution Capability', selectedScorecard.execution_capability || 3, scorecard.execution_capability || 3)}
                     </div>
                 </div>
                 
                 <div class="comparison-card-footer">
-                    <button class="btn-view-comparison" onclick="showDetailModal(${candidate.resume_id})">
+                    <button class="btn-view-comparison" onclick="showDetailModal('${candidate.resume_id}')">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
                             <circle cx="12" cy="12" r="3"></circle>
@@ -1682,7 +2111,12 @@ function resetForm() {
     selectedFiles = [];
     filePreviewList.innerHTML = '';
     filePreviewList.style.display = 'none';
+    
+    // Clear analysis results and upload queue
     analysisResults = [];
+    uploadQueue.clear();
+    fileHashCache.clear();
+    activeUploads = 0;
     
     // Hide results, show upload
     document.getElementById('resultsSection').style.display = 'none';

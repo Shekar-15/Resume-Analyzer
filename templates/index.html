@@ -94,7 +94,8 @@
                                 </label>
                                 
                                 <div class="multi-file-input-wrapper">
-                                    <input type="file" id="resumes" name="resumes" multiple accept=".pdf,.png,.jpg,.jpeg,.gif,.bmp" required>
+                                    <input type="file" id="resumes" name="resumes" multiple accept=".pdf,.png,.jpg,.jpeg,.gif,.bmp">
+                                    <input type="file" id="resumes-folder" name="resumes-folder" multiple webkitdirectory directory accept=".pdf,.png,.jpg,.jpeg,.gif,.bmp" style="display: none;">
                                     <div class="file-drop-zone" id="fileDropZone">
                                         <div class="drop-zone-content">
                                             <div class="upload-icon">
@@ -305,6 +306,6 @@ Required skills, experience, qualifications, responsibilities, etc." required></
         </div>
     </footer>
 
-    <script src="/static/script.js"></script>
+    <script src="/static/script.js?v=2.1"></script>
 </body>
 </html>

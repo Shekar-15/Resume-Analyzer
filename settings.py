@@ -55,9 +55,9 @@ STATICFILES_DIRS = [
     os.path.join(BASE_DIR, 'static'),
 ]
 
-# File upload settings
-FILE_UPLOAD_MAX_MEMORY_SIZE = 16777216  # 16MB
-DATA_UPLOAD_MAX_MEMORY_SIZE = 16777216  # 16MB
+# File upload settings - Increased for bulk resume uploads (up to 500 files)
+FILE_UPLOAD_MAX_MEMORY_SIZE = 209715200  # 200MB
+DATA_UPLOAD_MAX_MEMORY_SIZE = 209715200  # 200MB
 
 # Default primary key field type
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'

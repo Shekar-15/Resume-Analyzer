@@ -2,7 +2,7 @@ import google.generativeai as genai
 import os
 
 # Get your free API key from: https://aistudio.google.com/app/apikey
-GOOGLE_API_KEY = 'AIzaSyDEz91q6T18LSP2Xy7AVjzoEUuuCdUCmT0'
+GOOGLE_API_KEY = 'AIzaSyClWFAQEpcWxaQyix3UJFHumOLEZPjNcCo'
 genai.configure(api_key=GOOGLE_API_KEY)
 
 print("Checking available models...")

@@ -762,6 +762,178 @@ textarea:focus {
     background: rgba(239, 68, 68, 0.1);
 }
 
+/* === FAANG-LEVEL UPLOAD QUEUE STYLES === */
+
+/* File icon status colors */
+.file-icon.queued {
+    background: var(--bg-tertiary);
+    color: var(--text-secondary);
+}
+
+.file-icon.uploading {
+    background: var(--primary-500);
+    color: white;
+}
+
+.file-icon.done {
+    background: var(--success);
+    color: white;
+}
+
+.file-icon.failed {
+    background: var(--error);
+    color: white;
+}
+
+/* Spinner animation for uploading state */
+.spinner {
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    from {
+        transform: rotate(0deg);
+    }
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* Progress bar */
+.progress-bar {
+    width: 100%;
+    height: 4px;
+    background: var(--bg-tertiary);
+    border-radius: 2px;
+    margin-top: 0.5rem;
+    overflow: hidden;
+}
+
+.progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--primary-500), var(--primary-600));
+    transition: width 0.3s ease;
+    border-radius: 2px;
+}
+
+/* File meta styling */
+.file-meta {
+    display: flex;
+    gap: 0.75rem;
+    align-items: center;
+    margin-top: 0.25rem;
+}
+
+.file-status {
+    font-size: 0.75rem;
+    text-transform: capitalize;
+    padding: 0.125rem 0.5rem;
+    border-radius: 4px;
+    font-weight: 600;
+}
+
+.file-status {
+    background: var(--bg-tertiary);
+    color: var(--text-secondary);
+}
+
+.file-error {
+    font-size: 0.75rem;
+    color: var(--error);
+    font-weight: 500;
+}
+
+/* Upload queue summary */
+.upload-queue-summary {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    margin-top: 0.5rem;
+}
+
+.summary-text {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+}
+
+.summary-text strong {
+    color: var(--text-primary);
+    font-weight: 700;
+}
+
+.separator {
+    margin: 0 0.5rem;
+    color: var(--text-tertiary);
+}
+
+.btn-clear-queue {
+    padding: 0.5rem 1rem;
+    background: transparent;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    color: var(--text-secondary);
+    font-weight: 600;
+    font-size: 0.875rem;
+    cursor: pointer;
+    transition: var(--transition-base);
+}
+
+.btn-clear-queue:hover {
+    background: var(--error);
+    border-color: var(--error);
+    color: white;
+}
+
+/* Add more container */
+.add-more-container {
+    display: flex;
+    gap: 0.75rem;
+    margin-top: 0.75rem;
+}
+
+.btn-add-more-files,
+.btn-add-folder {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 0.875rem 1.5rem;
+    background: var(--bg-secondary);
+    border: 2px dashed var(--border-color);
+    border-radius: var(--radius-md);
+    color: var(--text-secondary);
+    font-weight: 600;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: var(--transition-base);
+}
+
+.btn-add-more-files:hover,
+.btn-add-folder:hover {
+    background: var(--bg-tertiary);
+    border-color: var(--primary-500);
+    color: var(--primary-500);
+    transform: translateY(-2px);
+}
+
+.btn-add-more-files svg,
+.btn-add-folder svg {
+    transition: var(--transition-base);
+}
+
+.btn-add-more-files:hover svg {
+    transform: rotate(90deg);
+}
+
+.btn-add-folder:hover svg {
+    transform: scale(1.1);
+}
+
 /* === FORM ACTIONS === */
 .form-actions {
     display: flex;
@@ -1449,6 +1621,9 @@ textarea:focus {
     display: flex;
     align-items: flex-start;
     gap: 0.75rem;
+    /* Ensure text wraps properly with no truncation */
+    overflow: visible;
+    height: auto;
 }
 
 .gap-alert svg {
@@ -1466,6 +1641,10 @@ textarea:focus {
     color: var(--text-secondary);
     font-size: 0.875rem;
     line-height: 1.5;
+    /* Enable full text wrapping */
+    word-break: break-word;
+    white-space: normal;
+    overflow: visible;
 }
 
 /* Card Footer */
@@ -3620,6 +3799,18 @@ textarea:focus {
     animation: slideInRight 0.3s ease-out;
 }
 
+.toast.toast-success {
+    background: var(--success);
+}
+
+.toast.toast-info {
+    background: var(--primary-500);
+}
+
+.toast.toast-error {
+    background: var(--error);
+}
+
 @keyframes slideInRight {
     from {
         opacity: 0;
@@ -4086,7 +4277,7 @@ textarea:focus {
 
 .ranking-gap-alert {
     display: flex;
-    align-items: start;
+    align-items: flex-start;
     gap: 0.5rem;
     padding: 0.75rem;
     background: linear-gradient(135deg, rgba(239, 68, 68, 0.1), rgba(220, 38, 38, 0.05));
@@ -4095,12 +4286,22 @@ textarea:focus {
     font-size: 0.8rem;
     color: var(--text-secondary);
     line-height: 1.4;
+    /* Ensure full text visibility with no truncation */
+    overflow: visible;
+    height: auto;
 }
 
 .ranking-gap-alert svg {
     flex-shrink: 0;
     color: #ef4444;
     margin-top: 0.1rem;
+}
+
+.ranking-gap-alert span {
+    /* Enable full text wrapping on all screen sizes */
+    word-break: break-word;
+    white-space: normal;
+    overflow: visible;
 }
 
 .ranking-card-footer-pro {
